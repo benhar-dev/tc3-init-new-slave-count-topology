@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.3">
+  <POU Name="MAIN" Id="{b31057fa-aa28-4d9d-bc16-e5b53e7f8556}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+	bExecute : BOOL;
+	fbEcInitialiseNewSlaveCountTopology : FB_EcInitialiseNewSlaveCountTopology;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbEcInitialiseNewSlaveCountTopology(
+	stMasterNetIdPhys:=stMasterNetIdPhys, 
+	bEnable:= TRUE, 
+	bExecute:= bExecute , 
+	tTimeout:= , 
+	bBusy=> , 
+	bError=> , 
+	nErrId=> );
+
+bExecute := FALSE;]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="14" Count="1" />
+      <LineId Id="19" Count="4" />
+      <LineId Id="2" Count="0" />
+      <LineId Id="27" Count="0" />
+      <LineId Id="26" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

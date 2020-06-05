@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.3">
+  <GVL Name="GVL" Id="{8169e3f9-6ee2-4370-afb9-efada7f02e64}">
+    <Declaration><![CDATA[VAR_GLOBAL
+	stMasterNetIdPhys AT %I* : T_AmsNetIdArr;	
+	myInput AT %I*: BOOL;
+	myOutput AT %Q*: BOOL;
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

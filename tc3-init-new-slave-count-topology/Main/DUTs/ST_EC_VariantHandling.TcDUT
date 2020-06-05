@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.3">
+  <DUT Name="ST_EC_VariantHandling" Id="{074eb98c-232a-406e-acbe-798c133a3447}">
+    <Declaration><![CDATA[TYPE ST_EC_VariantHandling :
+STRUCT
+	iSlaveAddress 	: UINT; (* address of configured slave! *)
+	iEnable			: UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

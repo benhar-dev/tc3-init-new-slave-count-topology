@@ -1,0 +1,315 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.3">
+  <POU Name="FB_EcInitialiseNewSlaveCountTopology" Id="{4e6c31e3-9a52-4b57-9d6f-9e930252411e}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_EcInitialiseNewSlaveCountTopology
+VAR_INPUT
+	stMasterNetIdPhys	: T_AmsNetIdArr;(* AmsNetId of the EtherCAT master device.*)
+	bEnable				: BOOL; 		(* 0=disable, 1=enable *)
+	bExecute			: BOOL;			(* Function block execution is triggered by a rising edge at this input.*)
+	tTimeout			: TIME := DEFAULT_ADS_TIMEOUT;(* States the time before the function is cancelled. *)
+END_VAR
+VAR_OUTPUT
+	bBusy		: BOOL;
+	bError		: BOOL;
+	nErrId		: UDINT;
+END_VAR
+VAR
+	nStep: INT := 0;
+	RisingEdge	: R_TRIG;
+
+	iSlaveCount: UINT;
+	nSlaveAdr : UINT;
+	nSlaveConfigCnt : UINT;			
+	nSlaveActualCnt	: UINT;	
+
+	bEnableSlave : BOOL;
+	stMasterNetId : T_AmsNetId;
+	aSlaveCfg : ARRAY[0..EC_MAX_SLAVES] OF ST_EcSlaveConfigData;
+	aSlaveScan : ARRAY[0..EC_MAX_SLAVES] OF ST_EcSlaveScannedData;
+	
+	fbEcVariantHandling : FB_EcVariantHandling;
+	fbEcGetConfigSlaves : FB_EcGetConfSlaves;
+	fbEcGetScannedSlaves : FB_EcGetScannedSlaves;
+	fbEcSetMasterState : FB_EcSetMasterState;
+	fbEcGetMasterState : FB_EcGetMasterState;
+
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[RisingEdge( CLK:= bExecute );
+
+IF RisingEdge.Q THEN
+	bBusy := TRUE;
+	bError := FALSE;
+	nErrId := 0;
+	nStep := 10;
+	iSlaveCount := 1;
+END_IF
+
+CASE nStep OF
+	
+10:	(* convert from Master Net ID from byte array to string *)
+	stMasterNetId := F_CreateAmsNetId(nIds := stMasterNetIdPhys);
+	nStep := 20;
+	
+20: (* set Master to Init *)
+	fbEcSetMasterState(
+		sNetId:= stMasterNetId,
+		bExecute:= TRUE,
+		tTimeout:= tTimeout,
+		reqState:= EC_DEVICE_STATE_INIT);
+	IF NOT fbEcSetMasterState.bBusy
+	THEN
+		fbEcSetMasterState(
+			bExecute:= FALSE);
+			nStep := 30;
+	END_IF;
+	
+30: (* check if Master is in INIT *)
+	fbEcGetMasterState(
+		sNetId:= stMasterNetId,
+		bExecute:= TRUE,
+		tTimeout:= tTimeout);
+	IF NOT fbEcGetMasterState.bBusy
+	THEN
+		IF fbEcGetMasterState.bError THEN
+			bError := TRUE;
+			nErrId := fbEcGetMasterState.nErrId;
+			nStep := 1000; (* error handling *)
+		ELSIF (fbEcGetMasterState.state = EC_DEVICE_STATE_INIT)
+		THEN
+			nStep := 40;
+		END_IF;
+		fbEcGetMasterState(
+			bExecute:= FALSE);
+	END_IF;
+	
+40: (* set Master to Pre-OP *)
+	fbEcSetMasterState(
+		sNetId:= stMasterNetId,
+		bExecute:= TRUE,
+		tTimeout:= tTimeout,
+		reqState:= EC_DEVICE_STATE_PREOP);
+	IF NOT fbEcSetMasterState.bBusy
+	THEN
+		fbEcSetMasterState(
+			bExecute:= FALSE);
+			nStep := 50;
+	END_IF;
+	
+50: (* check if Master is in Pre-OP *)
+	fbEcGetMasterState(
+		sNetId:= stMasterNetId,
+		bExecute:= TRUE,
+		tTimeout:= tTimeout);
+	IF NOT fbEcGetMasterState.bBusy
+	THEN
+		IF fbEcGetMasterState.bError THEN
+			bError := TRUE;
+			nErrId := fbEcGetMasterState.nErrId;
+			nStep := 1000; (* error handling *)
+		ELSIF (fbEcGetMasterState.state = EC_DEVICE_STATE_PREOP)
+		THEN
+			nStep := 60;
+		END_IF;
+		fbEcGetMasterState(
+			bExecute:= FALSE);
+	END_IF;
+	
+60: (* get config count *)
+	fbEcGetConfigSlaves(
+		sNetId:= stMasterNetId,
+		pArrEcConfSlaveInfo:= ADR(aSlaveCfg),
+		cbBufLen:= SIZEOF(aSlaveCfg),
+		bExecute:= TRUE ,
+		tTimeout:= tTimeout);
+	IF NOT fbEcGetConfigSlaves.bBusy
+	THEN
+		IF NOT fbEcGetConfigSlaves.bError
+		THEN
+			nStep := 70;
+		ELSE
+			bError := TRUE;
+			nErrId := fbEcGetConfigSlaves.nErrorId;
+			nStep := 1000; (* error handling *)
+		END_IF;
+		fbEcGetConfigSlaves(
+			bExecute:= FALSE);
+	END_IF;
+	
+70: (* record known configured slave information *)
+	nSlaveAdr := aSlaveCfg[0].nAddr;
+	nSlaveConfigCnt := fbEcGetConfigSlaves.nSlaves;	
+	nStep := 80;
+	
+80: (* get actual slave count *)
+	fbEcGetScannedSlaves(
+		sNetId:= stMasterNetId,
+		pArrEcScannedSlaveInfo := ADR(aSlaveScan),
+		cbBufLen:= SIZEOF(aSlaveScan),
+		bExecute:= TRUE ,
+		tTimeout:= tTimeout);
+	IF NOT fbEcGetScannedSlaves.bBusy
+	THEN
+		IF NOT fbEcGetScannedSlaves.bError
+		THEN
+			nStep := 90;
+		ELSE
+			bError := TRUE;
+			nErrId := fbEcGetScannedSlaves.nErrorId;
+			nStep := 1000; (* error handling *)
+		END_IF;
+		fbEcGetScannedSlaves(
+			bExecute:= FALSE);
+	END_IF;
+	
+90: (* record known actual slave count *)
+	nSlaveActualCnt := fbEcGetScannedSlaves.nSlaves;	
+	nStep := 100;
+
+100: (* set Master to Init *)
+	fbEcSetMasterState(
+		sNetId:= stMasterNetId,
+		bExecute:= TRUE,
+		tTimeout:= tTimeout,
+		reqState:= EC_DEVICE_STATE_INIT);
+	IF NOT fbEcSetMasterState.bBusy
+	THEN
+		fbEcSetMasterState(
+			bExecute:= FALSE);
+			nStep := 110;
+	END_IF;
+110: (* check if Master is in INIT *)
+	fbEcGetMasterState(
+		sNetId:= stMasterNetId,
+		bExecute:= TRUE,
+		tTimeout:= tTimeout);
+	IF NOT fbEcGetMasterState.bBusy
+	THEN
+		IF fbEcGetMasterState.bError THEN
+			bError := TRUE;
+			nErrId := fbEcGetMasterState.nErrId;
+			nStep := 1000; (* error handling *)
+		ELSIF (fbEcGetMasterState.state = EC_DEVICE_STATE_INIT)
+		THEN
+			nStep := 120;
+		END_IF;
+		fbEcGetMasterState(
+			bExecute:= FALSE);
+	END_IF;
+120: (* check to see if there are more slaves to process*)
+	IF iSlaveCount <= nSlaveConfigCnt THEN
+		nStep := 130;
+	ELSE
+		nStep := 150;
+	END_IF
+	
+130: (* enable / disable slave *)
+	bEnableSlave := (iSlaveCount <= nSlaveActualCnt);
+	fbEcVariantHandling(
+		sNetId:= stMasterNetId,
+		nSlaveAddr:= nSlaveAdr,
+		bEnable:= bEnableSlave,
+		bExecute:= TRUE ,
+		tTimeout:= tTimeout);
+	IF NOT fbEcVariantHandling.bBusy
+	THEN
+		IF NOT fbEcVariantHandling.bError
+		THEN
+			nStep := 140;
+		ELSE
+			bError := TRUE;
+			nErrId := fbEcVariantHandling.nErrId;
+			nStep := 1000; (* error handling *)
+		END_IF;
+		fbEcVariantHandling(
+			bExecute:= FALSE);
+	END_IF;
+	
+140: (* check next slave *)
+	iSlaveCount := iSlaveCount + 1;
+	nSlaveAdr := nSlaveAdr + 1;
+	nStep := 120;
+	
+150: (* set Master to OP *)
+	fbEcSetMasterState(
+		sNetId:= stMasterNetId,
+		bExecute:= TRUE,
+		tTimeout:= tTimeout,
+		reqState:= EC_DEVICE_STATE_OP);
+	IF NOT fbEcSetMasterState.bBusy
+	THEN
+		fbEcSetMasterState(
+			bExecute:= FALSE);
+			nStep := 160;
+	END_IF;
+160: (* check if Master is in OP *)
+	fbEcGetMasterState(
+		sNetId:= stMasterNetId,
+		bExecute:= TRUE,
+		tTimeout:= tTimeout);
+
+	IF NOT fbEcGetMasterState.bBusy
+	THEN
+		IF fbEcGetMasterState.bError THEN
+			bError := TRUE;
+			nErrId := fbEcGetMasterState.nErrId;
+			nStep := 1000; (* error handling *)
+		ELSIF (fbEcGetMasterState.state = EC_DEVICE_STATE_OP)
+		THEN
+			nStep := 170;
+		ELSE 
+			nStep := 150;
+		END_IF;
+		fbEcGetMasterState(
+			bExecute:= FALSE);
+	END_IF;
+	
+170: (* final step *)
+
+	bBusy := FALSE;
+	nStep := 0;
+	
+1000: (* error handling *)
+
+	bBusy := FALSE;
+		;
+ELSE
+	;
+END_CASE;]]></ST>
+    </Implementation>
+    <LineIds Name="FB_EcInitialiseNewSlaveCountTopology">
+      <LineId Id="364" Count="27" />
+      <LineId Id="560" Count="0" />
+      <LineId Id="392" Count="6" />
+      <LineId Id="601" Count="0" />
+      <LineId Id="605" Count="2" />
+      <LineId Id="399" Count="3" />
+      <LineId Id="404" Count="2" />
+      <LineId Id="567" Count="0" />
+      <LineId Id="569" Count="19" />
+      <LineId Id="613" Count="6" />
+      <LineId Id="610" Count="0" />
+      <LineId Id="594" Count="1" />
+      <LineId Id="568" Count="0" />
+      <LineId Id="407" Count="24" />
+      <LineId Id="554" Count="0" />
+      <LineId Id="432" Count="3" />
+      <LineId Id="564" Count="2" />
+      <LineId Id="438" Count="0" />
+      <LineId Id="440" Count="12" />
+      <LineId Id="555" Count="0" />
+      <LineId Id="557" Count="0" />
+      <LineId Id="559" Count="0" />
+      <LineId Id="556" Count="0" />
+      <LineId Id="453" Count="19" />
+      <LineId Id="621" Count="6" />
+      <LineId Id="620" Count="0" />
+      <LineId Id="478" Count="56" />
+      <LineId Id="630" Count="8" />
+      <LineId Id="629" Count="0" />
+      <LineId Id="539" Count="14" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

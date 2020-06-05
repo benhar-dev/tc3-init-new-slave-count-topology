@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.3">
+  <POU Name="FB_EcVariantHandling" Id="{e1db975b-ec9a-437d-82d8-f3ed5dc93ab9}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_EcVariantHandling
+VAR_INPUT
+	sNetId				: T_AmsNetId;	(* AmsNetId of the EtherCAT master device.*)
+	nSlaveAddr			: UINT;			(* Address of the slave device.*)
+	bEnable				: BOOL; 			(* 0=disable, 1=enable *)
+	bExecute			: BOOL;			(* Function block execution is triggered by a rising edge at this input.*)
+	tTimeout				: TIME := DEFAULT_ADS_TIMEOUT;(* States the time before the function is cancelled. *)
+END_VAR
+VAR_OUTPUT
+	bBusy		: BOOL;
+	bError		: BOOL;
+	nErrId		: UDINT;
+END_VAR
+VAR
+	fbAdsWrite	: ADSWRITE;
+	RisingEdge	: R_TRIG;
+	stEcVariantHandling : st_EC_varianthandling;
+END_VAR
+
+VAR CONSTANT
+	nPortNo		: UINT := 16#FFFF;
+	nIdxGroup 	: UDINT := 16#31;
+	nIdxOffset 	: UDINT := 16#0;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[RisingEdge( CLK:= bExecute );
+IF RisingEdge.Q THEN
+	bBusy := TRUE;
+	bError := FALSE;
+	nErrId := 0;
+
+	(* fill struct *)
+	stEcVariantHandling.iSlaveAddress := nSlaveAddr;
+	stEcVariantHandling.iEnable := BOOL_TO_UINT(bEnable);
+
+	fbAdsWrite( WRITE := FALSE );
+	fbAdsWrite( 	NETID := sNetId,
+					PORT := nPortNo,
+					IDXGRP :=nIdxGroup,
+					IDXOFFS := nIdxOffset ,
+					SRCADDR := ADR(stEcVariantHandling),
+					LEN   := SIZEOF(stEcVariantHandling) ,
+					WRITE  := TRUE,
+					TMOUT := tTimeout );
+ELSE
+	fbAdsWrite( WRITE:= FALSE, BUSY=>bBusy, ERR=>bError, ERRID=>nErrID );
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="FB_EcVariantHandling">
+      <LineId Id="3" Count="20" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
