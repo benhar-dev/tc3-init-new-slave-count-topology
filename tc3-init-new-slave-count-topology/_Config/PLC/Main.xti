@@ -53,17 +53,4 @@
 			</TaskPouOids>
 		</Instance>
 	</Project>
-	<Mappings>
-		<OwnerA Name="Main Instance">
-			<OwnerB Name="TIID^Device 2 (EtherCAT)">
-				<Link VarA="PlcTask Inputs^GVL.stMasterNetIdPhys" VarB="InfoData^AmsNetId"/>
-			</OwnerB>
-			<OwnerB Name="TIID^Device 2 (EtherCAT)^Term 1 (EK1200)^Term 2 (EL1008)">
-				<Link VarA="PlcTask Inputs^GVL.myInput" VarB="Channel 1^Input" Size="1"/>
-			</OwnerB>
-			<OwnerB Name="TIID^Device 2 (EtherCAT)^Term 1 (EK1200)^Term 3 (EL2024)">
-				<Link VarA="PlcTask Outputs^GVL.myOutput" VarB="Channel 1^Output" Size="1"/>
-			</OwnerB>
-		</OwnerA>
-	</Mappings>
 </TcSmItem>
